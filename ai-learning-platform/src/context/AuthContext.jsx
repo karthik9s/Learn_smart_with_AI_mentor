@@ -61,6 +61,7 @@ export function AuthProvider({ children }) {
   };
 
   const loginWithGoogle = async () => {
+    if (!supabaseEnabled) throw new Error("Supabase not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: { redirectTo: window.location.origin },
@@ -69,6 +70,7 @@ export function AuthProvider({ children }) {
   };
 
   const loginWithMicrosoft = async () => {
+    if (!supabaseEnabled) throw new Error("Supabase not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY.");
     const { error } = await supabase.auth.signInWithOAuth({
       provider: "azure",
       options: { redirectTo: window.location.origin },
