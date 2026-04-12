@@ -8,8 +8,9 @@ app.use(cors({
   origin: [
     "http://localhost:5173",
     "http://localhost:3000",
-    /\.vercel\.app$/,          // any Vercel preview URL
-    process.env.FRONTEND_URL,  // set this in Render env vars
+    "https://learn-smart-with-ai-mentor-97l2ln4a0-karthik9s-projects.vercel.app",
+    /\.vercel\.app$/,
+    process.env.FRONTEND_URL,
   ].filter(Boolean),
   credentials: true,
 }));
