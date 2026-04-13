@@ -31,8 +31,8 @@ if (!supabaseEnabled) {
 }
 
 /* ── Create client ONLY when properly configured ──────────
-   If not configured, export a stub that throws clear errors
-   so nothing silently hits placeholder.supabase.co
+   If not configured, export a stub so nothing breaks at import time.
+   All actual Supabase calls are gated by supabaseEnabled checks.
    ──────────────────────────────────────────────────────── */
 export const supabase = supabaseEnabled
   ? createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
@@ -42,4 +42,4 @@ export const supabase = supabaseEnabled
         detectSessionInUrl: true,
       },
     })
-  : createClient("https://stub.supabase.co", "stub-key"); // stub — never actually called
+  : createClient("https://stub.invalid", "stub-key"); // never called — supabaseEnabled is false
