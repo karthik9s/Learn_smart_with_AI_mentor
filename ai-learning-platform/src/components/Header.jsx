@@ -1,5 +1,6 @@
 import { RefreshCw, Zap, FlaskConical } from "lucide-react";
 import ModeSelector from "./ModeSelector";
+import UsageCounter from "./UsageCounter";
 import { fetchLearn } from "../api";
 
 const LEVELS = ["basic", "intermediate", "advanced"];
@@ -58,6 +59,7 @@ export default function Header({ topic, setTopic, level, setLevel, onGenerate, l
                 </button>
               ))}
             </div>
+            <UsageCounter onUpgrade={() => {}} />
             <button type="submit" className="generate-btn" disabled={loading}>
               <Zap size={15} />{loading ? "Generating all modules..." : "Generate"}
             </button>

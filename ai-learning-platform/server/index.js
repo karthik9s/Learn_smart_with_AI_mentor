@@ -21,6 +21,14 @@ const key = process.env.GROQ_API_KEY;
 console.log("GROQ_API_KEY:", key ? `loaded (${key.slice(0, 8)}...)` : "MISSING ⚠️");
 
 // Routes
+const rateLimit = require("./middleware/rateLimit");
+app.use("/api/generate-all", rateLimit);
+app.use("/api/learn",        rateLimit);
+app.use("/api/quiz",         rateLimit);
+app.use("/api/mock-interview", rateLimit);
+app.use("/api/goal-roadmap", rateLimit);
+app.use("/api/daily-plan",   rateLimit);
+app.use("/api/study-chat",   rateLimit);
 app.use("/api", require("./routes/learn"));
 
 // Global error handler

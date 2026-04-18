@@ -9,6 +9,7 @@ import Header from "./components/Header";
 import FloatingChat from "./components/FloatingChat";
 import XPToast from "./components/XPToast";
 import LevelUpToast from "./components/LevelUpToast";
+import LimitReachedModal from "./components/LimitReachedModal";
 import Landing from "./pages/Landing";
 import AuthPage from "./pages/AuthPage";
 import Home from "./pages/Home";
@@ -39,6 +40,7 @@ export default function App() {
   const [mode, setMode] = useState("learn");
   const [allModules, setAllModules] = useState(null);
   const [interviewData, setInterviewData] = useState(null);
+  const [limitInfo, setLimitInfo] = useState(null); // for 403 modal
   const store = useAppStore();
 
   // Show landing if not logged in and not in guest mode
@@ -124,7 +126,15 @@ export default function App() {
       toast.success(`✅ "${t}" ready!`, { duration: 2000 });
     } catch (err) {
       console.error("Generate error:", err.message);
-      toast.error("Something went wrong. Check your API key.");
+      if (err.response?.status === 403 && err.response?.data?.error === "daily_limit_reached") {
+        setLimitInfo({
+          used:  err.response.data.used,
+          limit: err.response.data.limit,
+          plan:  err.response.data.plan,
+        });
+      } else {
+        toast.error("Something went wrong. Check your API key.");
+      }
     } finally {
       setLoading(false);
     }
@@ -254,6 +264,11 @@ export default function App() {
       <XPToast xpGain={store.xpGain} />
       <LevelUpToast levelUp={store.levelUp} />
       <AchievementToast achievement={store.newAchievement} />
+      <LimitReachedModal
+        info={limitInfo}
+        onClose={() => setLimitInfo(null)}
+        onUpgraded={() => setLimitInfo(null)}
+      />
     </div>
   );
 }

@@ -15,32 +15,64 @@ if (import.meta.env.DEV) {
 /* ── Axios instance ──────────────────────────────────────── */
 const api = axios.create({
   baseURL: BASE,
-  timeout: 60000, // 60s — Render cold starts can be slow
+  timeout: 60000,
   headers: { "Content-Type": "application/json" },
 });
 
-// Request logger (dev only)
-if (import.meta.env.DEV) {
-  api.interceptors.request.use(req => {
+// Attach plan + user-id headers on every request
+api.interceptors.request.use(req => {
+  try {
+    const plan = localStorage.getItem("mentorai_subscription") || "free";
+    const session = JSON.parse(localStorage.getItem("mentorai_gamification") || "{}");
+    req.headers["x-user-plan"] = plan;
+    if (session?.userId) req.headers["x-user-id"] = session.userId;
+  } catch {}
+  if (import.meta.env.DEV) {
     console.log(`[API →] ${req.method?.toUpperCase()} ${req.baseURL}${req.url}`, req.data || "");
-    return req;
-  });
-}
+  }
+  return req;
+});
 
-// Response logger + error normaliser
+// Response logger + error normaliser + save usage from headers
 api.interceptors.response.use(
   res => {
     if (import.meta.env.DEV) console.log(`[API ←] ${res.status} ${res.config.url}`);
+    // Save usage info from rate limit headers
+    const used      = res.headers["x-usage-used"];
+    const limit     = res.headers["x-usage-limit"];
+    const remaining = res.headers["x-usage-remaining"];
+    if (used !== undefined && limit !== undefined) {
+      try {
+        localStorage.setItem("mentorai_usage_display", JSON.stringify({
+          used: Number(used), limit: Number(limit), remaining: Number(remaining),
+        }));
+      } catch {}
+    }
     return res;
   },
   err => {
-    const url  = err.config?.url || "";
+    const url    = err.config?.url || "";
     const status = err.response?.status;
-    const msg  = err.response?.data?.error || err.response?.data?.message || err.message;
+    const msg    = err.response?.data?.error || err.response?.data?.message || err.message;
     console.error(`[API ✗] ${status || "NET"} ${url} — ${msg}`);
     return Promise.reject(err);
   }
 );
+
+// Save usage headers for display
+api.interceptors.response.use(res => {
+  const used      = res.headers["x-usage-used"];
+  const limit     = res.headers["x-usage-limit"];
+  const remaining = res.headers["x-usage-remaining"];
+  if (used !== undefined && limit !== undefined) {
+    try {
+      localStorage.setItem("mentorai_usage_display", JSON.stringify({
+        used: parseInt(used), limit: parseInt(limit), remaining: parseInt(remaining || 0)
+      }));
+    } catch {}
+  }
+  return res;
+}, err => Promise.reject(err));
 
 /* ── API helpers ─────────────────────────────────────────── */
 const post = (path, data) => api.post(path, data);

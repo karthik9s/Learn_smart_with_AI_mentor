@@ -50,7 +50,7 @@ export function incrementUsage(type) {
 
 export function canUse(type) {
   const plan = getPlan();
-  if (plan === "pro") return true;
+  if (plan === "pro" || plan === "premium") return true;
   const usage = getUsage();
   const limit = PLANS.free.limits[type];
   return (usage[type] || 0) < limit;
@@ -58,7 +58,7 @@ export function canUse(type) {
 
 export function getRemainingUsage(type) {
   const plan = getPlan();
-  if (plan === "pro") return Infinity;
+  if (plan === "pro" || plan === "premium") return Infinity;
   const usage = getUsage();
   const limit = PLANS.free.limits[type];
   return Math.max(0, limit - (usage[type] || 0));

@@ -1,20 +1,23 @@
-import { Home, BookOpen, Map, Dumbbell, Briefcase, MessageCircle, BarChart2, Clock, GraduationCap, CalendarDays, Crown, ChevronLeft, ChevronRight, LogOut, Zap, CheckCircle } from "lucide-react";
+import { useState } from "react";
+import { Home, BookOpen, Dumbbell, Briefcase, MessageCircle, BarChart2, Clock, GraduationCap, CalendarDays, ChevronLeft, ChevronRight, LogOut, Zap, CheckCircle, X } from "lucide-react";
 import { getPlan } from "../lib/subscription";
+import PricingPage from "../pages/PricingPage";
 
 const NAV = [
   { id: "home",         label: "Home",           icon: Home },
   { id: "learn",        label: "Learn",          icon: BookOpen,      color: "#a78bfa" },
-  { id: "learningplan", label: "Learning Plan",  icon: CalendarDays,  color: "#ec4899" },
+  { id: "learningplan", label: "Learning Plan",  icon: CalendarDays,  color: "#a78bfa" },
   { id: "practice",     label: "Practice",       icon: Dumbbell,      color: "#f59e0b" },
   { id: "interviewprep",label: "Interview Prep", icon: Briefcase,     color: "#f59e0b" },
-  { id: "study",        label: "Smart Study",    icon: GraduationCap, color: "#ec4899" },
+  { id: "study",        label: "Smart Study",    icon: GraduationCap, color: "#a78bfa" },
   { id: "ask",          label: "Ask AI",         icon: MessageCircle, color: "#64748b" },
   { id: "history",      label: "History",        icon: Clock },
   { id: "progress",     label: "Progress",       icon: BarChart2 },
 ];
 
 export default function Sidebar({ page, mode, setPage, setMode, collapsed, setCollapsed, xp, userLevel, levelName, xpProgress, user, onLogout }) {
-  const plan = getPlan();
+  const [plan, setPlanState] = useState(getPlan());
+  const [showPricing, setShowPricing] = useState(false);
 
   const handleNav = (item) => {
     if (["home", "progress", "ask", "history", "study", "learningplan", "interviewprep", "mockinterview", "pricing"].includes(item.id)) {
@@ -36,6 +39,7 @@ export default function Sidebar({ page, mode, setPage, setMode, collapsed, setCo
         <span className="sidebar-logo-icon">🎓</span>
         {!collapsed && <span className="sidebar-logo-text">Mentor<span className="logo-ai">AI</span></span>}
       </div>
+
       <nav className="sidebar-nav">
         {NAV.map(({ id, label, icon: Icon, color }) => {
           const active = isActive({ id });
@@ -80,21 +84,36 @@ export default function Sidebar({ page, mode, setPage, setMode, collapsed, setCo
         </div>
       )}
 
-      {/* Subscription state */}
+      {/* Upgrade button */}
       {!collapsed && plan === "free" && (
-        <button className="sb-upgrade-btn" onClick={() => setPage("pricing")}>
+        <button className="sb-upgrade-btn" onClick={() => setShowPricing(true)}>
           <Zap size={14} /> Upgrade to Pro
         </button>
       )}
-      {!collapsed && plan === "pro" && (
+      {!collapsed && (plan === "pro" || plan === "premium") && (
         <div className="sb-pro-active">
-          <CheckCircle size={13} /> Pro Activated
+          <CheckCircle size={13} /> {plan === "premium" ? "Premium" : "Pro"} Activated
         </div>
       )}
 
       <button className="sidebar-collapse-btn" onClick={() => setCollapsed(c => !c)}>
         {collapsed ? <ChevronRight size={16} /> : <><ChevronLeft size={16} /><span>Collapse</span></>}
       </button>
+
+      {/* Pricing Modal */}
+      {showPricing && (
+        <div className="sb-modal-overlay" onClick={() => setShowPricing(false)}>
+          <div className="sb-modal-content" onClick={e => e.stopPropagation()}>
+            <button className="sb-modal-close" onClick={() => setShowPricing(false)}>
+              <X size={18} />
+            </button>
+            <PricingPage onUpgrade={() => {
+              setPlanState(getPlan());
+              setShowPricing(false);
+            }} />
+          </div>
+        </div>
+      )}
     </aside>
   );
 }
