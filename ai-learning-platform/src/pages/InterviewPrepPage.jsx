@@ -56,6 +56,7 @@ function PracticeMode({ topic, count, difficulty }) {
   const [appending, setAppending] = useState(false);
 
   const generate = async (append = false) => {
+    if (loading) return;
     setLoading(true);
     try {
       const r = await fetchInterview(topic, "mixed", count, difficulty);
@@ -233,6 +234,7 @@ function MockMode({ topic, mockLevel }) {
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [currentQuestion, summary, loading]);
 
   const start = async () => {
+    if (loading) return;
     setLoading(true); setPhase("answering");
     setFeedbackLog([]); setSummary(null); setHistory([]); setQuestionNum(1);
     try {

@@ -22,10 +22,12 @@ const api = axios.create({
 // Attach plan + user-id headers on every request
 api.interceptors.request.use(req => {
   try {
-    const plan = localStorage.getItem("mentorai_subscription") || "free";
+    const plan  = localStorage.getItem("mentorai_subscription") || "free";
+    const token = localStorage.getItem("token");
     const session = JSON.parse(localStorage.getItem("mentorai_gamification") || "{}");
     req.headers["x-user-plan"] = plan;
     if (session?.userId) req.headers["x-user-id"] = session.userId;
+    if (token) req.headers["Authorization"] = `Bearer ${token}`;
   } catch {}
   if (import.meta.env.DEV) {
     console.log(`[API →] ${req.method?.toUpperCase()} ${req.baseURL}${req.url}`, req.data || "");
@@ -116,5 +118,14 @@ const authHeader = () => ({ headers: { Authorization: `Bearer ${localStorage.get
 export const saveTopic    = (topic, level, xpEarned) => api.post("/progress/topic",    { topic, level, xpEarned }, authHeader());
 export const saveQuiz     = (topic, score, total, weakAreas) => api.post("/progress/quiz", { topic, score, total, weakAreas }, authHeader());
 export const savePractice = () => api.post("/progress/practice", {}, authHeader());
+
+/* ── Payment endpoints ───────────────────────────────────── */
+export const createOrder      = (plan)    => post("/payment/create-order",   { plan });
+export const verifyPayment    = (payload) => post("/payment/verify-payment", payload);
+export const getPaymentStatus = ()        => get("/payment/status");
+
+/* ── User endpoints ──────────────────────────────────────── */
+export const getUserPlan  = () => get("/user/plan");
+export const getUserUsage = () => get("/user/usage");
 
 export default api;

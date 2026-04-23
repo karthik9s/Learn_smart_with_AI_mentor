@@ -132,7 +132,7 @@ export default function AskAIPage() {
             <p className="ac-welcome-sub">Ask me anything — concepts, career advice, code explanations, or just explore ideas.</p>
             <div className="ac-starters-grid">
               {STARTERS.map((s, i) => (
-                <button key={i} className="ac-starter-card" onClick={() => send(s.text)}>
+                <button key={i} className="ac-starter-card" onClick={() => send(s.text)} disabled={loading}>
                   <span className="ac-starter-icon">{s.icon}</span>
                   <span className="ac-starter-text">{s.text}</span>
                 </button>

@@ -22,6 +22,12 @@ export function AuthProvider({ children }) {
     supabase.auth.getSession().then(({ data: { session } }) => {
       clearTimeout(timeout);
       setUser(session?.user ?? null);
+      // Store access token for backend API calls
+      if (session?.access_token) {
+        localStorage.setItem("token", session.access_token);
+      } else {
+        localStorage.removeItem("token");
+      }
       setLoading(false);
     }).catch(() => {
       clearTimeout(timeout);
@@ -31,6 +37,11 @@ export function AuthProvider({ children }) {
     // Listen for auth changes
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+      if (session?.access_token) {
+        localStorage.setItem("token", session.access_token);
+      } else {
+        localStorage.removeItem("token");
+      }
     });
 
     return () => subscription.unsubscribe();
@@ -80,6 +91,7 @@ export function AuthProvider({ children }) {
 
   const logout = async () => {
     await supabase.auth.signOut();
+    localStorage.removeItem("token");
     setUser(null);
   };
 

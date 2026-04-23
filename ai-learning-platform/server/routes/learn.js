@@ -1,47 +1,106 @@
 
 const express = require("express");
 const router = express.Router();
-const Groq = require("groq-sdk");
+const { getCache, setCache }                     = require("../lib/cache");
+const { checkSemanticCache, storeSemanticCache } = require("../lib/semanticCache");
+const { routeAI }                                = require("../lib/aiRouter");
+const { recordSemanticHit, recordHashHit, recordMiss } = require("../lib/stats");
 
-// Lazy init — ensures dotenv has loaded before reading the key
-let _groq = null;
-function getGroq() {
-  if (!_groq) {
-    const key = process.env.GROQ_API_KEY;
-    if (!key) throw new Error("GROQ_API_KEY not set in environment");
-    _groq = new Groq({ apiKey: key });
-    console.log("Groq initialized with key:", key.slice(0, 8) + "...");
+/* ── Groq error classifier ──────────────────────────────────
+   Maps provider HTTP errors to clean { status, message } pairs.
+   Never leaks raw SDK objects to the frontend.
+   ──────────────────────────────────────────────────────── */
+function classifyGroqError(e) {
+  const status = e?.status ?? e?.response?.status ?? e?.statusCode ?? null;
+
+  if (status === 429) {
+    return { httpStatus: 503, message: "AI service is busy. Please try again in 30 seconds.", code: "rate_limited" };
   }
-  return _groq;
+  if (status >= 500 && status < 600) {
+    return { httpStatus: 500, message: "AI service temporarily unavailable.", code: "groq_server_error" };
+  }
+  if (status === 401 || status === 403) {
+    return { httpStatus: 500, message: "AI service configuration error.", code: "auth_error" };
+  }
+  return { httpStatus: 500, message: "Something went wrong. Please try again.", code: "unknown_error" };
 }
 
-const SYSTEM_PROMPT = `You are an expert AI tutor and mentor.
-Your goal is to TEACH, not just explain.
-Rules:
-- Adapt to the student's level (basic / intermediate / advanced)
-- Explain concepts step-by-step
-- Use real-world examples + technical clarity
-- Always explain WHY and HOW
-- Be structured, clear, and slightly conversational
-- Avoid shallow answers
-You are guiding a student through learning, not dumping information.`;
-
-async function call(prompt) {
+/* ── call(prompt, endpoint) ─────────────────────────────────
+   Thin wrapper around routeAI. Passes the endpoint hint so the
+   router can skip keyword classification for known route types.
+   Normalises errors into the same shape as before.
+   ──────────────────────────────────────────────────────── */
+async function call(prompt, endpoint = "") {
   try {
-    const res = await getGroq().chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages: [
-        { role: "system", content: SYSTEM_PROMPT },
-        { role: "user", content: prompt }
-      ],
-      temperature: 0.7,
-      max_tokens: 4096,
-    });
-    const text = res.choices[0].message.content;
-    return text.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    return await routeAI(prompt, endpoint);
   } catch (e) {
-    console.error("Groq API error:", e.message);
-    throw e;
+    // If routeAI already attached httpStatus (all_providers_failed), re-throw as-is
+    if (e.httpStatus) throw e;
+    const { httpStatus, message, code } = classifyGroqError(e);
+    console.error(`[AI Error] ${code} (${httpStatus}):`, e.message);
+    const err = new Error(message);
+    err.httpStatus = httpStatus;
+    err.code = code;
+    throw err;
+  }
+}
+
+/* ── Shared route error responder ───────────────────────────
+   Reads the structured info attached by classifyGroqError,
+   or falls back to 500 for unexpected throws.
+   ──────────────────────────────────────────────────────── */
+function handleError(res, e, context = "") {
+  const status  = e.httpStatus ?? 500;
+  const message = e.message   ?? "Something went wrong. Please try again.";
+  const code    = e.code      ?? "unknown_error";
+  if (!e.httpStatus) {
+    // Not a classified Groq error — log it fully
+    console.error(`[Route Error]${context ? " " + context + ":" : ""}`, e.message);
+  }
+  return res.status(status).json({ success: false, error: message, code });
+}
+
+/* ── Cache-aware request wrapper ────────────────────────────
+   Lookup order:
+     1. Semantic cache  (Cohere similarity ≥ 0.85, level-scoped)
+     2. Hash cache      (exact SHA-256 match)
+     3. Groq API        (cache miss — writes both caches after)
+
+   All cache writes are fire-and-forget (never block the response).
+   ──────────────────────────────────────────────────────── */
+async function withCache({ topic, level, endpoint, hashKey, generate, res }) {
+
+  // 1. Semantic cache check (level-scoped, TTL-filtered, best-match only)
+  const semanticHit = await checkSemanticCache(topic, level, endpoint);
+  if (semanticHit) {
+    recordSemanticHit();
+    console.log(`[Semantic Cache HIT] ${endpoint} "${topic}" @ ${level}`);
+    return res.json({ ...semanticHit, _cached: true, _cache: "semantic" });
+  }
+
+  // 2. Exact hash cache check
+  const hashHit = await getCache(topic, hashKey);
+  if (hashHit) {
+    recordHashHit();
+    console.log(`[Hash Cache HIT] ${endpoint} "${topic}" @ ${level}`);
+    storeSemanticCache(topic, level, endpoint, hashHit);
+    return res.json({ ...hashHit, _cached: true, _cache: "hash" });
+  }
+
+  recordMiss();
+  console.log(`[AI API CALL (Groq)] ${endpoint} "${topic}" @ ${level}`);
+
+  // 3. Call Groq — write both caches on success
+  try {
+    const result = await generate();
+    // FIX 6: only cache valid, non-null results
+    if (result) {
+      setCache(topic, hashKey, result);
+      storeSemanticCache(topic, level, endpoint, result);
+    }
+    return res.json(result);
+  } catch (e) {
+    return handleError(res, e, endpoint);
   }
 }
 
@@ -49,7 +108,13 @@ async function call(prompt) {
 router.post("/generate-all", async (req, res) => {
   const { topic, level } = req.body;
 
-  const learnPrompt = `
+  await withCache({
+    topic, level,
+    endpoint: "generate-all",
+    hashKey:  `generate-all:${level}`,
+    res,
+    generate: async () => {
+      const learnPrompt = `
 You are an expert AI tutor. Teach "${topic}" at "${level}" level as a mini course.
 Return ONLY valid JSON:
 {
@@ -84,30 +149,34 @@ Return ONLY valid JSON:
   "common_mistakes": [], "tips": [], "cheat_sheet": []
 }`;
 
-  try {
-    const [learnRaw, roadmapRaw, practiceRaw, interviewRaw] = await Promise.all([
-      call(learnPrompt),
-      call(roadmapPrompt),
-      call(practicePrompt),
-      call(interviewPrompt),
-    ]);
+      const [learnRaw, roadmapRaw, practiceRaw, interviewRaw] = await Promise.all([
+        call(learnPrompt),
+        call(roadmapPrompt),
+        call(practicePrompt),
+        call(interviewPrompt),
+      ]);
 
-    res.json({
-      learn:     JSON.parse(learnRaw),
-      roadmap:   JSON.parse(roadmapRaw),
-      practice:  JSON.parse(practiceRaw),
-      interview: JSON.parse(interviewRaw),
-    });
-  } catch (e) {
-    console.error("generate-all error:", e.message);
-    res.status(500).json({ error: "Failed to generate modules", details: e.message });
-  }
+      return {
+        learn:     JSON.parse(learnRaw),
+        roadmap:   JSON.parse(roadmapRaw),
+        practice:  JSON.parse(practiceRaw),
+        interview: JSON.parse(interviewRaw),
+      };
+    },
+  });
 });
 
 // POST /api/learn
 router.post("/learn", async (req, res) => {
   const { topic, level } = req.body;
-  const prompt = `
+
+  await withCache({
+    topic, level,
+    endpoint: "learn",
+    hashKey:  level,
+    res,
+    generate: async () => {
+      const prompt = `
 You are an expert AI tutor and professor.
 Teach the topic: "${topic}"
 Student level: "${level}"
@@ -155,19 +224,23 @@ Return ONLY valid JSON (no markdown, no extra text):
   "interview_ready_points": [],
   "summary": ""
 }`;
-  try {
-    const raw = await call(prompt);
-    res.json(JSON.parse(raw));
-  } catch (e) {
-    console.error("Learn error:", e.message);
-    res.status(500).json({ error: "Failed to generate learning module", details: e.message });
-  }
+      const raw = await call(prompt);
+      return JSON.parse(raw);
+    },
+  });
 });
 
 // POST /api/quiz
 router.post("/quiz", async (req, res) => {
   const { topic, level } = req.body;
-  const prompt = `
+
+  await withCache({
+    topic, level,
+    endpoint: "quiz",
+    hashKey:  `quiz:${level}`,
+    res,
+    generate: async () => {
+      const prompt = `
 Generate 5 MCQs for "${topic}" at "${level}" level.
 Also provide feedback template.
 
@@ -187,12 +260,10 @@ Return ONLY valid JSON:
     "improvement_suggestions": []
   }
 }`;
-  try {
-    const raw = await call(prompt);
-    res.json(JSON.parse(raw));
-  } catch (e) {
-    res.status(500).json({ error: "Failed to generate quiz", details: e.message });
-  }
+      const raw = await call(prompt);
+      return JSON.parse(raw);
+    },
+  });
 });
 
 // POST /api/playground
@@ -220,7 +291,7 @@ Return ONLY valid JSON:
     const raw = await call(prompt);
     res.json(JSON.parse(raw));
   } catch (e) {
-    res.status(500).json({ error: "Failed to generate playground", details: e.message });
+    return handleError(res, e, "playground");
   }
 });
 
@@ -240,13 +311,20 @@ Return ONLY valid JSON:
     const raw = await call(prompt);
     res.json(JSON.parse(raw));
   } catch (e) {
-    res.status(500).json({ error: "Failed to generate ELI10", details: e.message });
+    return handleError(res, e, "eli10");
   }
 });
 
 // POST /api/revision
 router.post("/revision", async (req, res) => {
   const { topic } = req.body;
+
+  const cached = await getCache(topic, "revision");
+  if (cached) {
+    console.log(`[cache HIT] revision "${topic}"`);
+    return res.json({ ...cached, _cached: true });
+  }
+
   const prompt = `
 Summarize "${topic}" for quick revision.
 Return ONLY valid JSON:
@@ -258,9 +336,11 @@ Return ONLY valid JSON:
 }`;
   try {
     const raw = await call(prompt);
-    res.json(JSON.parse(raw));
+    const result = JSON.parse(raw);
+    setCache(topic, "revision", result);
+    res.json(result);
   } catch (e) {
-    res.status(500).json({ error: "Failed to generate revision", details: e.message });
+    return handleError(res, e, "revision");
   }
 });
 
@@ -286,7 +366,7 @@ Return ONLY valid JSON:
     const raw = await call(prompt);
     res.json(JSON.parse(raw));
   } catch (e) {
-    res.status(500).json({ error: "Failed to answer doubt", details: e.message });
+    return handleError(res, e, "doubt");
   }
 });
 
@@ -338,23 +418,29 @@ If type is "summary": populate overall_score, strengths, improvements, is_final=
   ];
 
   try {
-    const r = await getGroq().chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages,
-      temperature: 0.7,
-    });
-    const text = r.choices[0].message.content
-      .replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const { callGroq } = require("../lib/aiRouter");
+    const r = await callGroq(
+      messages.map(m => `${m.role === "system" ? "[SYSTEM]" : "[USER]"} ${m.content}`).join("\n\n")
+    );
+    const text = r.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
     res.json(JSON.parse(text));
   } catch (e) {
-    console.error("mock-interview error:", e.message);
-    res.status(500).json({ error: "Failed", details: e.message });
+    const { httpStatus, message, code } = classifyGroqError(e);
+    console.error(`[AI Error] mock-interview ${code} (${httpStatus}):`, e.message);
+    return res.status(httpStatus).json({ success: false, error: message, code });
   }
 });
 
 // POST /api/roadmap-overview — lightweight phase overview
 router.post("/roadmap-overview", async (req, res) => {
   const { goal, level = "beginner" } = req.body;
+
+  const cached = await getCache(goal, `roadmap-overview:${level}`);
+  if (cached) {
+    console.log(`[cache HIT] roadmap-overview "${goal}" @ ${level}`);
+    return res.json({ ...cached, _cached: true });
+  }
+
   const prompt = `Create a simple learning roadmap overview for: "${goal}" at ${level} level.
 Keep it minimal — just phases and key topics.
 Return ONLY valid JSON:
@@ -368,15 +454,23 @@ Return ONLY valid JSON:
 }`;
   try {
     const raw = await call(prompt);
-    res.json(JSON.parse(raw));
+    const result = JSON.parse(raw);
+    setCache(goal, `roadmap-overview:${level}`, result);
+    res.json(result);
   } catch (e) {
-    res.status(500).json({ error: "Failed", details: e.message });
+    return handleError(res, e, "roadmap-overview");
   }
 });
 
 // POST /api/daily-plan — generates 30-day plan in 3 batches of 10
 router.post("/daily-plan", async (req, res) => {
   const { goal, level = "beginner" } = req.body;
+
+  const cached = await getCache(goal, `daily-plan:${level}`);
+  if (cached) {
+    console.log(`[cache HIT] daily-plan "${goal}" @ ${level}`);
+    return res.json({ ...cached, _cached: true });
+  }
 
   const batchPrompt = (startDay, endDay, phase) => `
 You are a personal AI mentor creating a daily learning plan.
@@ -414,10 +508,11 @@ Return ONLY valid JSON:
       ...JSON.parse(b3).days,
     ];
 
-    res.json({ title: `30-Day ${goal} Plan`, goal, level, total_days: days.length, days });
+    const result = { title: `30-Day ${goal} Plan`, goal, level, total_days: days.length, days };
+    setCache(goal, `daily-plan:${level}`, result);
+    res.json(result);
   } catch (e) {
-    console.error("daily-plan error:", e.message);
-    res.status(500).json({ error: "Failed to generate daily plan", details: e.message });
+    return handleError(res, e, "daily-plan");
   }
 });
 
@@ -425,6 +520,12 @@ Return ONLY valid JSON:
 router.post("/goal-roadmap", async (req, res) => {
   const { goal, level = "beginner", weeks = 6 } = req.body;
   const actualWeeks = Math.min(parseInt(weeks) || 6, 6);
+
+  const cached = await getCache(goal, `goal-roadmap:${level}:${actualWeeks}w`);
+  if (cached) {
+    console.log(`[cache HIT] goal-roadmap "${goal}" @ ${level} ${actualWeeks}w`);
+    return res.json({ ...cached, _cached: true });
+  }
 
   const prompt = `You are an expert learning curriculum designer.
 Create a structured learning roadmap for: "${goal}"
@@ -482,10 +583,10 @@ Return ONLY valid JSON:
     const raw = await call(prompt);
     const parsed = JSON.parse(raw);
     parsed.total_weeks = parsed.weeks?.length || actualWeeks;
+    setCache(goal, `goal-roadmap:${level}:${actualWeeks}w`, parsed);
     res.json(parsed);
   } catch (e) {
-    console.error("goal-roadmap error:", e.message);
-    res.status(500).json({ error: "Failed to generate roadmap", details: e.message });
+    return handleError(res, e, "goal-roadmap");
   }
 });
 
@@ -528,17 +629,14 @@ If type is "quiz", populate quiz:
   ];
 
   try {
-    const res2 = await getGroq().chat.completions.create({
-      model: "llama-3.3-70b-versatile",
-      messages,
-      temperature: 0.8,
-    });
-    const text = res2.choices[0].message.content
-      .replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+    const { callGroq } = require("../lib/aiRouter");
+    const fullPrompt = messages.map(m => `${m.role === "system" ? "[SYSTEM]" : "[USER]"} ${m.content}`).join("\n\n");
+    const text = await callGroq(fullPrompt);
     res.json(JSON.parse(text));
   } catch (e) {
-    console.error("study-chat error:", e.message);
-    res.status(500).json({ error: "Failed", details: e.message });
+    const { httpStatus, message, code } = classifyGroqError(e);
+    console.error(`[AI Error] study-chat ${code} (${httpStatus}):`, e.message);
+    return res.status(httpStatus).json({ success: false, error: message, code });
   }
 });
 
@@ -562,6 +660,8 @@ Return ONLY valid JSON:
     const raw = await call(prompt);
     res.json(JSON.parse(raw));
   } catch (e) {
+    // detect-intent is non-critical — fall back silently
+    console.error("[Groq Error] detect-intent:", e.message);
     res.json({ mode: "learn", topic: query, confidence: "medium" });
   }
 });
@@ -604,13 +704,20 @@ Rules:
     const raw = await call(prompt);
     res.json(JSON.parse(raw));
   } catch (e) {
-    res.status(500).json({ error: "Failed", details: e.message });
+    return handleError(res, e, "search-answer");
   }
 });
 
 // POST /api/roadmap
 router.post("/roadmap", async (req, res) => {
   const { topic, level } = req.body;
+
+  const cached = await getCache(topic, `roadmap:${level}`);
+  if (cached) {
+    console.log(`[cache HIT] roadmap "${topic}" @ ${level}`);
+    return res.json({ ...cached, _cached: true });
+  }
+
   const prompt = `
 You are a structured course designer.
 Create a complete learning roadmap for "${topic}" at "${level}" level.
@@ -636,15 +743,24 @@ Return ONLY valid JSON:
 }`;
   try {
     const raw = await call(prompt);
-    res.json(JSON.parse(raw));
+    const result = JSON.parse(raw);
+    setCache(topic, `roadmap:${level}`, result);
+    res.json(result);
   } catch (e) {
-    res.status(500).json({ error: "Failed to generate roadmap", details: e.message });
+    return handleError(res, e, "roadmap");
   }
 });
 
 // POST /api/interview
 router.post("/interview", async (req, res) => {
   const { topic, level, count = 5, difficulty = "mixed" } = req.body;
+
+  const cached = await getCache(topic, `interview:${level}:${count}:${difficulty}`);
+  if (cached) {
+    console.log(`[cache HIT] interview "${topic}" @ ${level}`);
+    return res.json({ ...cached, _cached: true });
+  }
+
   const diffNote = difficulty === "mixed"
     ? "Mix easy, medium, and hard questions"
     : `All questions should be ${difficulty} difficulty`;
@@ -674,16 +790,24 @@ Return ONLY valid JSON:
 }`;
   try {
     const raw = await call(prompt);
-    res.json(JSON.parse(raw));
+    const result = JSON.parse(raw);
+    setCache(topic, `interview:${level}:${count}:${difficulty}`, result);
+    res.json(result);
   } catch (e) {
-    console.error("Interview error:", e.message);
-    res.status(500).json({ error: "Failed to generate interview prep", details: e.message });
+    return handleError(res, e, "interview");
   }
 });
 
 // POST /api/auto-practice
 router.post("/auto-practice", async (req, res) => {
   const { topic, level } = req.body;
+
+  const cached = await getCache(topic, `auto-practice:${level}`);
+  if (cached) {
+    console.log(`[cache HIT] auto-practice "${topic}" @ ${level}`);
+    return res.json({ ...cached, _cached: true });
+  }
+
   const prompt = `
 You are an expert tutor creating a progressive practice set for "${topic}" at "${level}" level.
 Generate exactly 5 practice questions with increasing difficulty: 2 easy, 2 medium, 1 hard.
@@ -707,9 +831,11 @@ Return ONLY valid JSON:
 }`;
   try {
     const raw = await call(prompt);
-    res.json(JSON.parse(raw));
+    const result = JSON.parse(raw);
+    setCache(topic, `auto-practice:${level}`, result);
+    res.json(result);
   } catch (e) {
-    res.status(500).json({ error: "Failed to generate practice", details: e.message });
+    return handleError(res, e, "auto-practice");
   }
 });
 
@@ -740,13 +866,24 @@ Return ONLY valid JSON:
     const raw = await call(prompt);
     res.json(JSON.parse(raw));
   } catch (e) {
-    res.status(500).json({ error: "Failed to check answer", details: e.message });
+    return handleError(res, e, "check-answer");
   }
 });
 
 // POST /api/next-steps
 router.post("/next-steps", async (req, res) => {
   const { topic, level, weakAreas } = req.body;
+
+  // Only cache when there are no weak areas (personalised responses shouldn't be cached)
+  const cacheKey = `next-steps:${level}`;
+  if (!weakAreas?.length) {
+    const cached = await getCache(topic, cacheKey);
+    if (cached) {
+      console.log(`[cache HIT] next-steps "${topic}" @ ${level}`);
+      return res.json({ ...cached, _cached: true });
+    }
+  }
+
   const weakContext = weakAreas?.length ? `The student struggled with: ${weakAreas.join(", ")}.` : "";
   const prompt = `
 You are an expert learning advisor.
@@ -771,9 +908,11 @@ Return ONLY valid JSON:
 }`;
   try {
     const raw = await call(prompt);
-    res.json(JSON.parse(raw));
+    const result = JSON.parse(raw);
+    if (!weakAreas?.length) setCache(topic, `next-steps:${level}`, result);
+    res.json(result);
   } catch (e) {
-    res.status(500).json({ error: "Failed", details: e.message });
+    return handleError(res, e, "next-steps");
   }
 });
 
@@ -794,13 +933,20 @@ Return ONLY valid JSON:
     const raw = await call(prompt);
     res.json(JSON.parse(raw));
   } catch (e) {
-    res.status(500).json({ error: "Failed", details: e.message });
+    return handleError(res, e, "try-yourself");
   }
 });
 
 // POST /api/selfcheck
 router.post("/selfcheck", async (req, res) => {
   const { topic, level } = req.body;
+
+  const cached = await getCache(topic, `selfcheck:${level}`);
+  if (cached) {
+    console.log(`[cache HIT] selfcheck "${topic}" @ ${level}`);
+    return res.json({ ...cached, _cached: true });
+  }
+
   const prompt = `
 Generate 5 conceptual self-check questions for "${topic}" at "${level}" level.
 Rules:
@@ -816,9 +962,11 @@ Return ONLY valid JSON:
 }`;
   try {
     const raw = await call(prompt);
-    res.json(JSON.parse(raw));
+    const result = JSON.parse(raw);
+    setCache(topic, `selfcheck:${level}`, result);
+    res.json(result);
   } catch (e) {
-    res.status(500).json({ error: "Failed to generate self-check", details: e.message });
+    return handleError(res, e, "selfcheck");
   }
 });
 
@@ -858,7 +1006,7 @@ Return ONLY valid JSON: {"response": ""}`,
     const raw = await call(prompt);
     res.json(JSON.parse(raw));
   } catch (e) {
-    res.status(500).json({ error: "Tutor action failed", details: e.message });
+    return handleError(res, e, "tutor-action");
   }
 });
 

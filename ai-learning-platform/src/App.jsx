@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Toaster, toast } from "react-hot-toast";
 import { fetchGenerateAll } from "./api";
-import { useAppStore, XP } from "./store/useAppStore";
+import { useAppStore } from "./store/useAppStore";
 import { useAuth } from "./context/AuthContext";
 import { saveTopic, saveQuizResult, recordPractice as dbRecordPractice } from "./lib/db";
 import Sidebar from "./components/Sidebar";
@@ -28,7 +28,12 @@ import { addTopicToMemory, addQuizResult as addQuizToMemory, addWeakArea } from 
 import { canUse, incrementUsage } from "./lib/subscription";
 import { saveSession } from "./lib/session";
 import PricingPage from "./pages/PricingPage";
+import PricingFeaturePage from "./pages/PricingFeaturePage";
 import Onboarding, { hasOnboarded } from "./components/Onboarding";
+import SystemStatsPage from "./pages/SystemStatsPage";
+import GoalRoadmapPage from "./pages/GoalRoadmapPage";
+import MockInterviewPage from "./pages/MockInterviewPage";
+import SubscriptionPage from "./pages/SubscriptionPage";
 import "./App.css";
 
 export default function App() {
@@ -39,9 +44,19 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [mode, setMode] = useState("learn");
   const [allModules, setAllModules] = useState(null);
-  const [interviewData, setInterviewData] = useState(null);
   const [limitInfo, setLimitInfo] = useState(null); // for 403 modal
   const store = useAppStore();
+
+  // ── Read topic/level from URL query params ──────────────
+  const [prefillTopic] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    return p.get("topic") || "";
+  });
+  const [prefillLevel] = useState(() => {
+    const p = new URLSearchParams(window.location.search);
+    const l = p.get("level") || "";
+    return ["basic", "intermediate", "advanced", "beginner"].includes(l) ? l : "";
+  });
 
   // Show landing if not logged in and not in guest mode
   const [guestMode, setGuestMode] = useState(false);
@@ -55,17 +70,29 @@ export default function App() {
   }
 
   if (authMode === "auth" && !isAuthenticated) {
-    return <AuthPage onSuccess={() => {
-      setAuthMode(null);
-      setGuestMode(!user);
-      if (!hasOnboarded()) setShowOnboarding(true);
-    }} />;
+    return <AuthPage
+      prefillTopic={prefillTopic}
+      prefillLevel={prefillLevel}
+      onSuccess={() => {
+        setAuthMode(null);
+        setGuestMode(!user);
+        // Apply prefill topic/level from URL params
+        if (prefillTopic) {
+          store.setTopic(prefillTopic);
+          const normalizedLevel = prefillLevel === "beginner" ? "basic" : prefillLevel || "basic";
+          store.setLevel(normalizedLevel);
+        }
+        // Clean params from URL without reload
+        window.history.replaceState({}, "", window.location.pathname);
+        if (!hasOnboarded()) setShowOnboarding(true);
+      }}
+    />;
   }
 
   if (showOnboarding) {
     return <Onboarding
       userName={user?.user_metadata?.name?.split(" ")[0] || ""}
-      onComplete={({ goal, level }) => {
+      onComplete={({ level }) => {
         if (level) store.setLevel(level === "beginner" ? "basic" : level === "advanced" ? "advanced" : "intermediate");
         setShowOnboarding(false);
       }}
@@ -91,6 +118,7 @@ export default function App() {
   };
 
   const generate = async (overrideTopic) => {
+    if (loading) return; // prevent duplicate calls
     const t = (overrideTopic || store.topic).trim();
     console.log("Generate clicked:", t);
     if (!t) { toast.error("Please enter a topic"); return; }
@@ -105,15 +133,13 @@ export default function App() {
     if (overrideTopic) store.setTopic(overrideTopic);
     setLoading(true);
     store.setLearnData(null); store.setQuizData(null); store.setPgData(null);
-    setAllModules(null); setInterviewData(null);
+    setAllModules(null);
     try {
       const r = await fetchGenerateAll(t, store.level);
       const modules = r.data;
       setAllModules(modules);
       store.setLearnData(modules.learn);
       store.setPgData(modules.practice);
-      
-      setInterviewData(modules.interview);
       store.setActiveTopic(t);
       store.recordTopic(t);
       store.setActiveSection("Intuition");
@@ -203,15 +229,17 @@ export default function App() {
       case "study":         return <SmartStudyPage />;
       case "interviewprep": return <InterviewPrepPage />;
       case "learningplan":  return <DailyPlanPage />;
-      case "pricing":       return <PricingPage onUpgrade={() => setPage("home")} />;
+      case "goalroadmap":   return <GoalRoadmapPage />;
+      case "mockinterview": return <MockInterviewPage />;
+      case "pricing":       return <PricingFeaturePage />;
+      case "subscription":  return <SubscriptionPage />;
+      case "stats":         return <SystemStatsPage />;
       case "history":
         return <HistoryPage onReopen={(entry) => {
           store.setTopic(entry.topic);
           store.setActiveTopic(entry.topic);
           store.setLearnData(entry.modules?.learn || null);
           store.setPgData(entry.modules?.practice || null);
-          
-          setInterviewData(entry.modules?.interview || null);
           setAllModules(entry.modules);
           setMode(entry.mode || "learn");
           setPage("learn");
