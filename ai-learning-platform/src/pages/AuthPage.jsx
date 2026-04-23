@@ -24,7 +24,7 @@ function MicrosoftIcon() {
   );
 }
 
-export default function AuthPage({ onSuccess }) {
+export default function AuthPage({ onSuccess, prefillTopic = "", prefillLevel = "" }) {
   const [mode, setMode]   = useState("login");
   const [form, setForm]   = useState({ name: "", email: "", password: "" });
   const [error, setError] = useState("");
@@ -66,6 +66,17 @@ export default function AuthPage({ onSuccess }) {
         <div className="auth-logo">🎓 Mentor<span className="logo-ai">AI</span></div>
         <h2>{mode === "login" ? "Welcome back" : "Create your account"}</h2>
         <p className="auth-sub">{mode === "login" ? "Sign in to continue learning" : "Start your AI learning journey"}</p>
+
+        {/* Prefill topic banner */}
+        {prefillTopic && (
+          <div className="auth-prefill-banner">
+            <span className="auth-prefill-icon">📘</span>
+            <span>
+              You'll start learning <strong>{prefillTopic}</strong>
+              {prefillLevel && <> at <strong>{prefillLevel}</strong> level</>}
+            </span>
+          </div>
+        )}
 
         {/* Social Buttons */}
         <div className="auth-social">

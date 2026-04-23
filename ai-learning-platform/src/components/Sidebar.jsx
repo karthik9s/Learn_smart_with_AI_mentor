@@ -1,26 +1,40 @@
-import { useState } from "react";
-import { Home, BookOpen, Dumbbell, Briefcase, MessageCircle, BarChart2, Clock, GraduationCap, CalendarDays, ChevronLeft, ChevronRight, LogOut, Zap, CheckCircle, X } from "lucide-react";
+import { useState, useEffect } from "react";
+import { Home, BookOpen, Dumbbell, Briefcase, MessageCircle, BarChart2, Clock, GraduationCap, CalendarDays, ChevronLeft, ChevronRight, LogOut, Zap, CheckCircle, Activity, ArrowRight, Navigation, Mic, Crown } from "lucide-react";
 import { getPlan } from "../lib/subscription";
-import PricingPage from "../pages/PricingPage";
 
 const NAV = [
-  { id: "home",         label: "Home",           icon: Home },
-  { id: "learn",        label: "Learn",          icon: BookOpen,      color: "#a78bfa" },
-  { id: "learningplan", label: "Learning Plan",  icon: CalendarDays,  color: "#a78bfa" },
-  { id: "practice",     label: "Practice",       icon: Dumbbell,      color: "#f59e0b" },
-  { id: "interviewprep",label: "Interview Prep", icon: Briefcase,     color: "#f59e0b" },
-  { id: "study",        label: "Smart Study",    icon: GraduationCap, color: "#a78bfa" },
-  { id: "ask",          label: "Ask AI",         icon: MessageCircle, color: "#64748b" },
-  { id: "history",      label: "History",        icon: Clock },
-  { id: "progress",     label: "Progress",       icon: BarChart2 },
+  { id: "home",          label: "Home",           icon: Home },
+  { id: "learn",         label: "Learn",          icon: BookOpen,      color: "#a78bfa" },
+  { id: "learningplan",  label: "Learning Plan",  icon: CalendarDays,  color: "#a78bfa" },
+  { id: "goalroadmap",   label: "Goal Roadmap",   icon: Navigation,    color: "#22d3ee" },
+  { id: "practice",      label: "Practice",       icon: Dumbbell,      color: "#f59e0b" },
+  { id: "interviewprep", label: "Interview Prep", icon: Briefcase,     color: "#f59e0b" },
+  { id: "mockinterview", label: "Mock Interview", icon: Mic,           color: "#f97316" },
+  { id: "study",         label: "Smart Study",    icon: GraduationCap, color: "#a78bfa" },
+  { id: "ask",           label: "Ask AI",         icon: MessageCircle, color: "#64748b" },
+  { id: "pricing",       label: "Pricing",        icon: Crown,         color: "#22d3ee" },
+  { id: "history",       label: "History",        icon: Clock },
+  { id: "progress",      label: "Progress",       icon: BarChart2 },
+  { id: "subscription",  label: "Subscription",   icon: Crown,         color: "#a78bfa" },
+  { id: "stats",         label: "System Stats",   icon: Activity,      color: "#22d3ee" },
 ];
 
 export default function Sidebar({ page, mode, setPage, setMode, collapsed, setCollapsed, xp, userLevel, levelName, xpProgress, user, onLogout }) {
   const [plan, setPlanState] = useState(getPlan());
-  const [showPricing, setShowPricing] = useState(false);
+
+  // Re-sync plan from localStorage whenever the sidebar renders
+  // (catches upgrades that happen in the pricing modal or elsewhere)
+  useEffect(() => {
+    const sync = () => setPlanState(getPlan());
+    sync();
+    window.addEventListener("storage", sync);
+    // Also poll every 2s to catch same-tab updates
+    const t = setInterval(sync, 2000);
+    return () => { window.removeEventListener("storage", sync); clearInterval(t); };
+  }, []);
 
   const handleNav = (item) => {
-    if (["home", "progress", "ask", "history", "study", "learningplan", "interviewprep", "mockinterview", "pricing"].includes(item.id)) {
+    if (["home", "progress", "ask", "history", "study", "learningplan", "interviewprep", "mockinterview", "pricing", "subscription", "stats", "goalroadmap"].includes(item.id)) {
       setPage(item.id);
     } else {
       setMode(item.id);
@@ -29,7 +43,7 @@ export default function Sidebar({ page, mode, setPage, setMode, collapsed, setCo
   };
 
   const isActive = (item) => {
-    if (["home", "progress", "ask", "history", "study", "learningplan", "interviewprep", "mockinterview", "pricing"].includes(item.id)) return page === item.id;
+    if (["home", "progress", "ask", "history", "study", "learningplan", "interviewprep", "mockinterview", "pricing", "subscription", "stats", "goalroadmap"].includes(item.id)) return page === item.id;
     return page === "learn" && mode === item.id;
   };
 
@@ -84,36 +98,28 @@ export default function Sidebar({ page, mode, setPage, setMode, collapsed, setCo
         </div>
       )}
 
-      {/* Upgrade button */}
+      {/* Upgrade button — navigates directly to subscription page */}
       {!collapsed && plan === "free" && (
-        <button className="sb-upgrade-btn" onClick={() => setShowPricing(true)}>
+        <button className="sb-upgrade-btn" onClick={() => setPage("subscription")}>
           <Zap size={14} /> Upgrade to Pro
         </button>
       )}
+      {/* Plan badge — always clickable, navigates to subscription */}
       {!collapsed && (plan === "pro" || plan === "premium") && (
-        <div className="sb-pro-active">
-          <CheckCircle size={13} /> {plan === "premium" ? "Premium" : "Pro"} Activated
-        </div>
+        <button
+          className="sb-pro-active"
+          onClick={() => setPage("subscription")}
+          title="View subscription"
+        >
+          <CheckCircle size={13} />
+          <span>{plan === "premium" ? "Premium" : "Pro"} Plan · Active</span>
+          <ArrowRight size={11} style={{ marginLeft: "auto", opacity: 0.6 }} />
+        </button>
       )}
 
       <button className="sidebar-collapse-btn" onClick={() => setCollapsed(c => !c)}>
         {collapsed ? <ChevronRight size={16} /> : <><ChevronLeft size={16} /><span>Collapse</span></>}
       </button>
-
-      {/* Pricing Modal */}
-      {showPricing && (
-        <div className="sb-modal-overlay" onClick={() => setShowPricing(false)}>
-          <div className="sb-modal-content" onClick={e => e.stopPropagation()}>
-            <button className="sb-modal-close" onClick={() => setShowPricing(false)}>
-              <X size={18} />
-            </button>
-            <PricingPage onUpgrade={() => {
-              setPlanState(getPlan());
-              setShowPricing(false);
-            }} />
-          </div>
-        </div>
-      )}
     </aside>
   );
 }

@@ -9,6 +9,7 @@ import WhatNext from "../components/WhatNext";
 import AISuggestions from "../components/AISuggestions";
 import PersonalizedBanner from "../components/PersonalizedBanner";
 import Recommendations from "../components/Recommendations";
+import SubscriptionCard from "../components/SubscriptionCard";
 
 const PLAN_KEY = "mentorai_daily_plans";
 const DONE_KEY = "mentorai_done_days";
@@ -285,7 +286,7 @@ function RichAnswerCard({ data, onExploreMode, onFollowUp, loading }) {
         <div className="ra-section">
           <div className="ra-section-header"><span>🔍</span><span>Explore More</span></div>
           <div className="rich-followup-chips">
-            {data.explore_more.map((q, i) => <button key={i} className="suggestion-chip" onClick={() => onFollowUp(q)}>{q}</button>)}
+            {data.explore_more.map((q, i) => <button key={i} className="suggestion-chip" onClick={() => onFollowUp(q)} disabled={loading}>{q}</button>)}
           </div>
         </div>
       )}
@@ -402,7 +403,7 @@ export default function Home({
 
   const handleSearch = async (q) => {
     const text = (q || query).trim();
-    if (!text) return;
+    if (!text || searching) return;
     setQuery(text);
     setAnswer(null);
     setSearching(true);
@@ -532,6 +533,9 @@ export default function Home({
             recentTopics={recentTopics}
           />
 
+          {/* Subscription Card — below progress section */}
+          <SubscriptionCard onNavigate={setPage} />
+
           <div className="hp-grid">
             {/* Continue Learning (recent topics) */}
             {recentTopics.length > 0 && (
@@ -554,7 +558,7 @@ export default function Home({
                 {recentTopics.length > 1 && (
                   <div className="hp-recent-chips">
                     {recentTopics.slice(1, 5).map((t, i) => (
-                      <button key={i} className="topic-chip recent" onClick={() => handleSearch(t)}>{t}</button>
+                      <button key={i} className="topic-chip recent" onClick={() => handleSearch(t)} disabled={searching}>{t}</button>
                     ))}
                   </div>
                 )}
@@ -571,7 +575,7 @@ export default function Home({
               </div>
               <div className="hp-topics-grid">
                 {POPULAR_TOPICS.map((t, i) => (
-                  <button key={i} className="hp-topic-pill" onClick={() => handleSearch(t)}>{t}</button>
+                  <button key={i} className="hp-topic-pill" onClick={() => handleSearch(t)} disabled={searching}>{t}</button>
                 ))}
               </div>
             </div>
@@ -602,6 +606,9 @@ export default function Home({
           </div>
         </>
       )}
+
+      {/* Subscription Card — always visible, outside search/answer conditional */}
+      <SubscriptionCard onNavigate={setPage} />
     </div>
   );
 }

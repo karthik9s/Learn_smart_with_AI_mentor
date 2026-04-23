@@ -55,6 +55,14 @@ const TESTIMONIALS = [
 ];
 
 export default function Landing({ onGetStarted }) {
+  // Build signup URL with topic + level query params
+  const handleStart = (topic, level = "beginner") => {
+    const params = new URLSearchParams({ topic, level });
+    // Update URL without reload so App.jsx can read params on next render
+    window.history.pushState({}, "", `?${params.toString()}`);
+    onGetStarted();
+  };
+
   return (
     <div className="ln-page">
 
@@ -107,11 +115,24 @@ export default function Landing({ onGetStarted }) {
         <div className="ln-hero-card">
           <div className="ln-hero-card-header">
             <div className="ln-hero-card-dot" style={{ background: "#8B5CF6" }} />
-            <span className="ln-hero-card-title">Try asking MentorAI...</span>
+            <span className="ln-hero-card-title">Start learning instantly →</span>
           </div>
           <div className="ln-hero-chips">
-            {["Recursion", "Neural Networks", "SQL Joins", "System Design", "React Hooks", "DBSCAN"].map((t, i) => (
-              <span key={i} className="ln-hero-chip">{t}</span>
+            {[
+              { topic: "Recursion",        level: "beginner"     },
+              { topic: "Neural Networks",  level: "intermediate" },
+              { topic: "SQL Joins",        level: "beginner"     },
+              { topic: "System Design",    level: "advanced"     },
+              { topic: "React Hooks",      level: "intermediate" },
+              { topic: "DBSCAN",           level: "advanced"     },
+            ].map(({ topic, level }, i) => (
+              <button
+                key={i}
+                className="ln-hero-chip"
+                onClick={() => handleStart(topic, level)}
+              >
+                {topic}
+              </button>
             ))}
           </div>
         </div>
@@ -205,6 +226,30 @@ export default function Landing({ onGetStarted }) {
               <span key={i} className="ln-cta-check"><CheckCircle size={14} /> {c}</span>
             ))}
           </div>
+
+          {/* Popular topic quick-start buttons */}
+          <div className="ln-cta-topics">
+            <p className="ln-cta-topics-label">Pick a topic to start right now:</p>
+            <div className="ln-cta-topic-btns">
+              {[
+                { topic: "Python",         level: "beginner"     },
+                { topic: "React",          level: "intermediate" },
+                { topic: "Machine Learning", level: "beginner"   },
+                { topic: "System Design",  level: "advanced"     },
+                { topic: "SQL",            level: "beginner"     },
+                { topic: "Data Structures", level: "intermediate"},
+              ].map(({ topic, level }, i) => (
+                <button
+                  key={i}
+                  className="ln-cta-topic-btn"
+                  onClick={() => handleStart(topic, level)}
+                >
+                  Start Learning {topic} →
+                </button>
+              ))}
+            </div>
+          </div>
+
           <button className="ln-cta-btn ln-cta-btn-large" onClick={onGetStarted}>
             <Zap size={18} /> Get Started Free
           </button>

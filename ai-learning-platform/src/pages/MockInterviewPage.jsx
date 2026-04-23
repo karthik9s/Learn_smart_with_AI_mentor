@@ -1,5 +1,5 @@
 import { useState, useRef, useEffect } from "react";
-import { Briefcase, Send, RotateCcw, Star, TrendingUp, AlertCircle, CheckCircle } from "lucide-react";
+import { Briefcase, Send, RotateCcw, AlertCircle, CheckCircle } from "lucide-react";
 import { fetchMockInterview } from "../api";
 
 const DOMAINS = [
@@ -111,6 +111,7 @@ export default function MockInterviewPage() {
   }, [currentQuestion, summary, loading]);
 
   const start = async () => {
+    if (loading) return;
     // Resolve effective domain: custom input takes priority
     const effectiveDomain = customDomain.trim() || domain;
     if (!effectiveDomain) {

@@ -1,8 +1,9 @@
+@import "tailwindcss";
+
 /* ═══════════════════════════════════════════════════════
    MentorAI — Premium Dark Theme (hardcoded, no variables)
    Primary: #8B5CF6 lavender | BG: #0B0F1A | Card: #111827
    ═══════════════════════════════════════════════════════ */
-
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
 html { font-size: 14px; }

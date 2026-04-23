@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { CalendarDays, CheckCircle, Circle, Clock, Download,
   ChevronLeft, ChevronRight, Trophy, Zap, Target, Map } from "lucide-react";
 import { fetchDailyPlan, fetchRoadmapOverview } from "../api";
@@ -176,6 +176,7 @@ export default function DailyPlanPage() {
   const [progress, setProgress] = useState("");
   const [view, setView]         = useState("today");
   const [showCompletion, setShowCompletion] = useState(false);
+  const debounceRef = useRef(null);
 
   const totalDays      = data?.days?.length || 0;
   const completedCount = totalDays > 0 ? Object.values(doneDays).filter(Boolean).length : 0;
@@ -193,22 +194,27 @@ export default function DailyPlanPage() {
 
   const generate = async (e) => {
     e?.preventDefault();
-    if (!goal.trim()) return;
-    setLoading(true); setData(null); setOverview(null); setDoneDays({}); setCurrentDay(1);
-    setProgress("Building roadmap overview...");
-    try {
-      const ovRes = await fetchRoadmapOverview(goal.trim(), level);
-      setOverview(ovRes.data);
-      setProgress("Generating days 1–10...");
-      setTimeout(() => setProgress("Generating days 11–20..."), 3000);
-      setTimeout(() => setProgress("Generating days 21–30..."), 6000);
-      const planRes = await fetchDailyPlan(goal.trim(), level);
-      setData(planRes.data);
-      savePlan(planRes.data);
-      setSaved(getSavedPlans());
-      setCurrentDay(1);
-    } catch { alert("Failed to generate. Please try again."); }
-    finally { setLoading(false); setProgress(""); }
+    if (!goal.trim() || loading) return;
+
+    // 300ms debounce
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true); setData(null); setOverview(null); setDoneDays({}); setCurrentDay(1);
+      setProgress("Building roadmap overview...");
+      try {
+        const ovRes = await fetchRoadmapOverview(goal.trim(), level);
+        setOverview(ovRes.data);
+        setProgress("Generating days 1–10...");
+        setTimeout(() => setProgress("Generating days 11–20..."), 3000);
+        setTimeout(() => setProgress("Generating days 21–30..."), 6000);
+        const planRes = await fetchDailyPlan(goal.trim(), level);
+        setData(planRes.data);
+        savePlan(planRes.data);
+        setSaved(getSavedPlans());
+        setCurrentDay(1);
+      } catch { alert("Failed to generate. Please try again."); }
+      finally { setLoading(false); setProgress(""); }
+    }, 300);
   };
 
   const loadSaved = (p) => {

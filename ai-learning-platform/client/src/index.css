@@ -1,4 +1,0 @@
-/* This file is intentionally minimal — styles live in src/index.css and src/App.css */
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-body { background: #0B0F1A; color: #F1F5F9; }
-#root { width: 100%; max-width: 100%; margin: 0; text-align: left; border: none; }

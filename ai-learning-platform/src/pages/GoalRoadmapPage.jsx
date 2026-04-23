@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Navigation, ChevronDown, ChevronUp, CheckCircle, Circle, BookOpen, Download, Share2 } from "lucide-react";
+import { useState, useRef, useCallback } from "react";
+import { Navigation, ChevronDown, ChevronUp, CheckCircle, Circle, Download } from "lucide-react";
 import { fetchGoalRoadmap } from "../api";
 import ShareRoadmap from "../components/ShareRoadmap";
 
@@ -36,12 +36,7 @@ function exportRoadmap(data) {
   URL.revokeObjectURL(url);
 }
 
-const PHASE_CONFIG = [
-  { key: "topics",      label: "📘 Topics",      color: "#a78bfa", bg: "#1a1040" },
-  { key: "concepts",    label: "🧠 Concepts",    color: "#38bdf8", bg: "#0c1a2e" },
-  { key: "practice",   label: "💪 Practice",    color: "#10b981", bg: "#052e16" },
-  { key: "application",label: "🚀 Application", color: "#f59e0b", bg: "#1a1500" },
-];
+// PHASE_CONFIG kept for potential future use — currently phases are rendered inline
 
 function WeekCard({ week, index }) {
   const [open, setOpen]         = useState(index === 0);
@@ -171,23 +166,29 @@ export default function GoalRoadmapPage() {
   const [data, setData]       = useState(null);
   const [loading, setLoading] = useState(false);
   const [saved, setSaved]     = useState(getSavedRoadmaps());
+  const debounceRef           = useRef(null);
 
-  const generate = async (e) => {
+  const generate = useCallback(async (e) => {
     e?.preventDefault();
-    if (!goal.trim()) return;
-    setLoading(true);
-    setData(null);
-    try {
-      const r = await fetchGoalRoadmap(goal.trim(), level, weeks);
-      setData(r.data);
-      saveRoadmap(r.data);
-      setSaved(getSavedRoadmaps());
-    } catch {
-      alert("Failed to generate roadmap. Please try again.");
-    } finally {
-      setLoading(false);
-    }
-  };
+    if (!goal.trim() || loading) return;
+
+    // 300ms debounce
+    clearTimeout(debounceRef.current);
+    debounceRef.current = setTimeout(async () => {
+      setLoading(true);
+      setData(null);
+      try {
+        const r = await fetchGoalRoadmap(goal.trim(), level, weeks);
+        setData(r.data);
+        saveRoadmap(r.data);
+        setSaved(getSavedRoadmaps());
+      } catch {
+        alert("Failed to generate roadmap. Please try again.");
+      } finally {
+        setLoading(false);
+      }
+    }, 300);
+  }, [goal, level, weeks, loading]);
 
   return (
     <div className="goal-roadmap-page">
