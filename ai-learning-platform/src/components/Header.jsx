@@ -19,7 +19,7 @@ export default function Header({ topic, setTopic, level, setLevel, onGenerate, l
 
   const handleSubmit = (e) => {
     e.preventDefault();
-    if (!topic.trim() || loading) return;
+    if (!topic.trim()) return;
     console.log("Generating:", topic);
     onGenerate();
   };

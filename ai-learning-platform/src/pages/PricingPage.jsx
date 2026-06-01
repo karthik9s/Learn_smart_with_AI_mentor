@@ -204,7 +204,7 @@ function PlanCard({ plan, isCurrent, isUpgrade, isDowngrade, isLoading, anyLoadi
           ].join(" ")}
           style={
             isDowngrade
-              ? { borderColor: `${plan.accent}30` }
+              ? { borderColor: `${plan.accent}30`, color: plan.accent }
               : {
                   background: `linear-gradient(135deg, ${plan.accent}, ${plan.id === "premium" ? "#0891B2" : "#6D28D9"})`,
                   boxShadow:  `0 4px 18px ${plan.glow}`,
@@ -213,10 +213,12 @@ function PlanCard({ plan, isCurrent, isUpgrade, isDowngrade, isLoading, anyLoadi
         >
           {isLoading ? (
             <span className="inline-block w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-          ) : isDowngrade ? (
-            <><TrendingDown size={13} className="inline mr-1.5 -mt-0.5" />Downgrade</>
-          ) : (
+          ) : isUpgrade ? (
             <><Zap size={13} className="inline mr-1.5 -mt-0.5" />{plan.ctaLabel}</>
+          ) : isDowngrade ? (
+            <><TrendingDown size={13} className="inline mr-1.5 -mt-0.5" />Downgrade to {plan.name}</>
+          ) : (
+            plan.ctaLabel
           )}
         </button>
       )}

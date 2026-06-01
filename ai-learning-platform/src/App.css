@@ -81,9 +81,23 @@
 
 .sidebar-upgrade-btn { margin: 0.6rem; padding: 0.55rem 0.85rem; background: rgba(139,92,246,0.12); border: 1px solid rgba(139,92,246,0.35); color: #A78BFA; border-radius: 12px; font-size: 0.8rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; gap: 0.4rem; transition: all 0.2s; }
 .sidebar-upgrade-btn:hover { background: rgba(139,92,246,0.22); box-shadow: 0 0 16px rgba(139,92,246,0.3); }
+.sb-pricing-btn { margin: 0.3rem 0.6rem 0.6rem; padding: 0.5rem 0.85rem; background: rgba(34,211,238,0.08); border: 1px solid rgba(34,211,238,0.25); color: #22D3EE; border-radius: 10px; font-size: 0.78rem; font-weight: 600; cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 0.4rem; transition: all 0.2s; width: calc(100% - 1.2rem); }
+.sb-pricing-btn:hover { background: rgba(34,211,238,0.18); box-shadow: 0 0 12px rgba(34,211,238,0.25); }
+
+/* Pricing cards in sidebar */
+.sb-pricing-section { padding: 0.5rem 0.6rem 0.2rem; border-top: 1px solid #1e2640; }
+.sb-pricing-label { font-size: 0.65rem; font-weight: 700; color: #4B5563; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 0.5rem; padding: 0 0.2rem; }
+.sb-pricing-cards { display: flex; gap: 0.35rem; }
+.sb-plan-card { flex: 1; display: flex; flex-direction: column; align-items: center; gap: 0.15rem; padding: 0.5rem 0.25rem; border-radius: 10px; border: 1px solid rgba(255,255,255,0.07); background: rgba(255,255,255,0.03); cursor: pointer; transition: all 0.2s; }
+.sb-plan-card:hover { background: rgba(255,255,255,0.07); border-color: rgba(255,255,255,0.15); transform: translateY(-1px); }
+.sb-plan-card.active { background: rgba(34,211,238,0.1); border-color: rgba(34,211,238,0.4); box-shadow: 0 0 10px rgba(34,211,238,0.15); }
+.sb-plan-card.active .sb-plan-name { color: #22D3EE; }
+.sb-plan-card.active .sb-plan-price { color: #22D3EE; }
+.sb-plan-name { font-size: 0.68rem; font-weight: 700; color: #94A3B8; white-space: nowrap; }
+.sb-plan-price { font-size: 0.62rem; color: #4B5563; font-weight: 600; }
+.sb-plan-card.active .sb-plan-price { color: rgba(34,211,238,0.7); }
+
 .sidebar-pro-badge { margin: 0.6rem; padding: 0.4rem 0.85rem; background: rgba(16,185,129,0.1); border: 1px solid rgba(16,185,129,0.25); color: #10B981; border-radius: 12px; font-size: 0.75rem; font-weight: 600; display: flex; align-items: center; gap: 0.35rem; }
-.sidebar-collapse-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.8rem 1.1rem; border-top: 1px solid #1e2640; border: none; background: none; color: #4B5563; cursor: pointer; font-size: 0.78rem; white-space: nowrap; overflow: hidden; transition: color 0.15s; border-top: 1px solid #1e2640; }
-.sidebar-collapse-btn:hover { color: #94A3B8; }
 
 /* ═══════════════════════════════════════════════════════
    Header

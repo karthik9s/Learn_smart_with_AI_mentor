@@ -12,8 +12,14 @@ export const PLANS = {
     name: "Pro",
     price: "$9/mo",
     limits: { generates: Infinity, smartStudy: Infinity, mockInterview: Infinity, goalRoadmap: Infinity },
-    features: ["Unlimited generations", "Unlimited Smart Study", "Unlimited Mock Interviews", "Unlimited Goal Roadmaps", "Advanced AI tutor", "Full history", "Priority support", "Export & share"],
+    features: ["Unlimited generations", "Unlimited Smart Study", "Unlimited Mock Interviews", "Unlimited Goal Roadmaps", "Advanced AI tutor", "Full history", "Priority support"],
   },
+  premium: {
+    name: "Premium",
+    price: "$19/mo",
+    limits: { generates: Infinity, smartStudy: Infinity, mockInterview: Infinity, goalRoadmap: Infinity },
+    features: ["Everything in Pro", "Personalized learning path", "Weak area analysis", "Faster AI responses", "Dedicated support"],
+  }
 };
 
 export function getPlan() {
