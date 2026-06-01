@@ -46,7 +46,7 @@ api.interceptors.response.use(
     if (used !== undefined && limit !== undefined) {
       try {
         localStorage.setItem("mentorai_usage_display", JSON.stringify({
-          used: Number(used), limit: Number(limit), remaining: Number(remaining),
+          used: Number(used), limit: Number(limit), remaining: Number(remaining ?? 0),
         }));
       } catch {}
     }
@@ -60,21 +60,6 @@ api.interceptors.response.use(
     return Promise.reject(err);
   }
 );
-
-// Save usage headers for display
-api.interceptors.response.use(res => {
-  const used      = res.headers["x-usage-used"];
-  const limit     = res.headers["x-usage-limit"];
-  const remaining = res.headers["x-usage-remaining"];
-  if (used !== undefined && limit !== undefined) {
-    try {
-      localStorage.setItem("mentorai_usage_display", JSON.stringify({
-        used: parseInt(used), limit: parseInt(limit), remaining: parseInt(remaining || 0)
-      }));
-    } catch {}
-  }
-  return res;
-}, err => Promise.reject(err));
 
 /* ── API helpers ─────────────────────────────────────────── */
 const post = (path, data) => api.post(path, data);
@@ -114,10 +99,10 @@ export const apiLogin  = (email, password)       => post("/auth/login",  { email
 export const apiMe     = (token) => get("/auth/me", { headers: { Authorization: `Bearer ${token}` } });
 
 /* ── Progress endpoints ──────────────────────────────────── */
-const authHeader = () => ({ headers: { Authorization: `Bearer ${localStorage.getItem("token")}` } });
-export const saveTopic    = (topic, level, xpEarned) => api.post("/progress/topic",    { topic, level, xpEarned }, authHeader());
-export const saveQuiz     = (topic, score, total, weakAreas) => api.post("/progress/quiz", { topic, score, total, weakAreas }, authHeader());
-export const savePractice = () => api.post("/progress/practice", {}, authHeader());
+// Note: Authorization header is injected automatically by the request interceptor
+export const saveTopic    = (topic, level, xpEarned) => api.post("/progress/topic",    { topic, level, xpEarned });
+export const saveQuiz     = (topic, score, total, weakAreas) => api.post("/progress/quiz", { topic, score, total, weakAreas });
+export const savePractice = () => api.post("/progress/practice", {});
 
 /* ── Payment endpoints ───────────────────────────────────── */
 export const createOrder      = (plan)    => post("/payment/create-order",   { plan });

@@ -14,37 +14,52 @@ export function AuthProvider({ children }) {
       return;
     }
 
-    // Add timeout so app never hangs if Supabase is unreachable
+    let settled = false; // prevent double-settle between timeout and getSession
+
+    // Fallback: never hang the app if Supabase is unreachable
     const timeout = setTimeout(() => {
-      setLoading(false);
+      if (!settled) {
+        settled = true;
+        setLoading(false);
+      }
     }, 3000);
 
     supabase.auth.getSession().then(({ data: { session } }) => {
       clearTimeout(timeout);
-      setUser(session?.user ?? null);
-      // Store access token for backend API calls
-      if (session?.access_token) {
-        localStorage.setItem("token", session.access_token);
-      } else {
-        localStorage.removeItem("token");
+      if (!settled) {
+        settled = true;
+        setUser(session?.user ?? null);
+        if (session?.access_token) {
+          localStorage.setItem("token", session.access_token);
+        } else {
+          localStorage.removeItem("token");
+        }
+        setLoading(false);
       }
-      setLoading(false);
     }).catch(() => {
       clearTimeout(timeout);
-      setLoading(false);
+      if (!settled) {
+        settled = true;
+        setLoading(false);
+      }
     });
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+    // Listen for auth changes (login, logout, token refresh)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
       if (session?.access_token) {
         localStorage.setItem("token", session.access_token);
       } else {
         localStorage.removeItem("token");
       }
+      // Ensure loading is cleared on any auth event (e.g. OAuth redirect)
+      setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(timeout);
+      subscription.unsubscribe();
+    };
   }, []);
 
   const signup = async (name, email, password) => {

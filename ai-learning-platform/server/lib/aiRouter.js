@@ -49,7 +49,27 @@ Rules:
 You are guiding a student through learning, not dumping information.`;
 
 function clean(text) {
-  return (text || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+  let t = (text || "").replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+
+  // Robust JSON extraction: find the outermost { } or [ ] block.
+  // This handles cases where the AI wraps JSON in prose like
+  // "Here is the result: { ... }" or adds trailing commentary.
+  const firstBrace   = t.indexOf("{");
+  const firstBracket = t.indexOf("[");
+  const firstIndex   =
+    firstBrace !== -1 && firstBracket !== -1
+      ? Math.min(firstBrace, firstBracket)
+      : Math.max(firstBrace, firstBracket); // -1 if neither found
+
+  const lastBrace   = t.lastIndexOf("}");
+  const lastBracket = t.lastIndexOf("]");
+  const lastIndex   = Math.max(lastBrace, lastBracket);
+
+  if (firstIndex !== -1 && lastIndex !== -1 && lastIndex >= firstIndex) {
+    t = t.substring(firstIndex, lastIndex + 1);
+  }
+
+  return t;
 }
 
 /* ══════════════════════════════════════════════════════════
