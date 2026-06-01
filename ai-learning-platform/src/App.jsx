@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, Suspense, lazy } from "react";
 import { Toaster, toast } from "react-hot-toast";
 import { fetchGenerateAll } from "./api";
 import { useAppStore } from "./store/useAppStore";
@@ -10,31 +10,38 @@ import FloatingChat from "./components/FloatingChat";
 import XPToast from "./components/XPToast";
 import LevelUpToast from "./components/LevelUpToast";
 import LimitReachedModal from "./components/LimitReachedModal";
-import Landing from "./pages/Landing";
-import AuthPage from "./pages/AuthPage";
-import Home from "./pages/Home";
-import LearnPage from "./pages/LearnPage";
-import PlaygroundPage from "./pages/PlaygroundPage";
-import QuizPage from "./pages/QuizPage";
-import ProgressPage from "./pages/ProgressPage";
-import AskAIPage from "./pages/AskAIPage";
-import SmartStudyPage from "./pages/SmartStudyPage";
-import InterviewPrepPage from "./pages/InterviewPrepPage";
-import DailyPlanPage from "./pages/DailyPlanPage";
-import HistoryPage from "./pages/HistoryPage";
 import AchievementToast from "./components/AchievementToast";
+import Onboarding, { hasOnboarded } from "./components/Onboarding";
+
+// Lazy-load all pages — each becomes its own JS chunk downloaded only when visited
+const Landing          = lazy(() => import("./pages/Landing"));
+const AuthPage         = lazy(() => import("./pages/AuthPage"));
+const Home             = lazy(() => import("./pages/Home"));
+const LearnPage        = lazy(() => import("./pages/LearnPage"));
+const PlaygroundPage   = lazy(() => import("./pages/PlaygroundPage"));
+const QuizPage         = lazy(() => import("./pages/QuizPage"));
+const ProgressPage     = lazy(() => import("./pages/ProgressPage"));
+const AskAIPage        = lazy(() => import("./pages/AskAIPage"));
+const SmartStudyPage   = lazy(() => import("./pages/SmartStudyPage"));
+const InterviewPrepPage = lazy(() => import("./pages/InterviewPrepPage"));
+const DailyPlanPage    = lazy(() => import("./pages/DailyPlanPage"));
+const HistoryPage      = lazy(() => import("./pages/HistoryPage"));
+const PricingPage      = lazy(() => import("./pages/PricingPage"));
+const PricingFeaturePage = lazy(() => import("./pages/PricingFeaturePage"));
+const SystemStatsPage  = lazy(() => import("./pages/SystemStatsPage"));
+const GoalRoadmapPage  = lazy(() => import("./pages/GoalRoadmapPage"));
+const MockInterviewPage = lazy(() => import("./pages/MockInterviewPage"));
+const SubscriptionPage = lazy(() => import("./pages/SubscriptionPage"));
 import { saveToHistory } from "./lib/storage";
 import { addTopicToMemory, addQuizResult as addQuizToMemory, addWeakArea } from "./lib/memory";
 import { canUse, incrementUsage } from "./lib/subscription";
 import { saveSession } from "./lib/session";
-import PricingPage from "./pages/PricingPage";
-import PricingFeaturePage from "./pages/PricingFeaturePage";
-import Onboarding, { hasOnboarded } from "./components/Onboarding";
-import SystemStatsPage from "./pages/SystemStatsPage";
-import GoalRoadmapPage from "./pages/GoalRoadmapPage";
-import MockInterviewPage from "./pages/MockInterviewPage";
-import SubscriptionPage from "./pages/SubscriptionPage";
 import "./App.css";
+
+// Spinner shown while a lazy page chunk is loading
+function PageLoader() {
+  return <div className="loader-wrap"><div className="spinner" /></div>;
+}
 
 export default function App() {
   const { user, loading: authLoading, logout } = useAuth();
@@ -66,37 +73,49 @@ export default function App() {
   if (authLoading) return <div className="loader-wrap"><div className="spinner" /></div>;
 
   if (!isAuthenticated && authMode !== "auth") {
-    return <Landing onGetStarted={() => setAuthMode("auth")} />;
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Landing onGetStarted={() => setAuthMode("auth")} />
+      </Suspense>
+    );
   }
 
   if (authMode === "auth" && !isAuthenticated) {
-    return <AuthPage
-      prefillTopic={prefillTopic}
-      prefillLevel={prefillLevel}
-      onSuccess={() => {
-        setAuthMode(null);
-        setGuestMode(!user);
-        // Apply prefill topic/level from URL params
-        if (prefillTopic) {
-          store.setTopic(prefillTopic);
-          const normalizedLevel = prefillLevel === "beginner" ? "basic" : prefillLevel || "basic";
-          store.setLevel(normalizedLevel);
-        }
-        // Clean params from URL without reload
-        window.history.replaceState({}, "", window.location.pathname);
-        if (!hasOnboarded()) setShowOnboarding(true);
-      }}
-    />;
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <AuthPage
+          prefillTopic={prefillTopic}
+          prefillLevel={prefillLevel}
+          onSuccess={() => {
+            setAuthMode(null);
+            setGuestMode(!user);
+            // Apply prefill topic/level from URL params
+            if (prefillTopic) {
+              store.setTopic(prefillTopic);
+              const normalizedLevel = prefillLevel === "beginner" ? "basic" : prefillLevel || "basic";
+              store.setLevel(normalizedLevel);
+            }
+            // Clean params from URL without reload
+            window.history.replaceState({}, "", window.location.pathname);
+            if (!hasOnboarded()) setShowOnboarding(true);
+          }}
+        />
+      </Suspense>
+    );
   }
 
   if (showOnboarding) {
-    return <Onboarding
-      userName={user?.user_metadata?.name?.split(" ")[0] || ""}
-      onComplete={({ level }) => {
-        if (level) store.setLevel(level === "beginner" ? "basic" : level === "advanced" ? "advanced" : "intermediate");
-        setShowOnboarding(false);
-      }}
-    />;
+    return (
+      <Suspense fallback={<PageLoader />}>
+        <Onboarding
+          userName={user?.user_metadata?.name?.split(" ")[0] || ""}
+          onComplete={({ level }) => {
+            if (level) store.setLevel(level === "beginner" ? "basic" : level === "advanced" ? "advanced" : "intermediate");
+            setShowOnboarding(false);
+          }}
+        />
+      </Suspense>
+    );
   }
 
   const persistTopic = async (t, lvl) => {
@@ -286,7 +305,11 @@ export default function App() {
           user={user}
           mode={mode} setMode={setMode}
         />
-        <main className="app-content">{renderPage()}</main>
+        <main className="app-content">
+          <Suspense fallback={<PageLoader />}>
+            {renderPage()}
+          </Suspense>
+        </main>
       </div>
       <FloatingChat topic={store.activeTopic} section={store.activeSection} />
       <XPToast xpGain={store.xpGain} />

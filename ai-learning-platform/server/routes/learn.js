@@ -422,8 +422,8 @@ If type is "summary": populate overall_score, strengths, improvements, is_final=
     const r = await callGroq(
       messages.map(m => `${m.role === "system" ? "[SYSTEM]" : "[USER]"} ${m.content}`).join("\n\n")
     );
-    const text = r.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
-    res.json(JSON.parse(text));
+    // callGroq already runs clean() which does robust JSON extraction
+    res.json(JSON.parse(r));
   } catch (e) {
     const { httpStatus, message, code } = classifyGroqError(e);
     console.error(`[AI Error] mock-interview ${code} (${httpStatus}):`, e.message);

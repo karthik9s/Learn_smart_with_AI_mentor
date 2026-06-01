@@ -38,7 +38,12 @@ const STORE_KEY = "mentorai_gamification";
 function loadState() {
   try {
     const raw = localStorage.getItem(STORE_KEY);
-    return raw ? JSON.parse(raw) : null;
+    const parsed = raw ? JSON.parse(raw) : null;
+    // Guard against corrupted values: must be a plain object, not an array or primitive
+    if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) {
+      return parsed;
+    }
+    return null;
   } catch { return null; }
 }
 

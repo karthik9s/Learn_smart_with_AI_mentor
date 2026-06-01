@@ -109,10 +109,13 @@ export default function SmartStudyPage() {
     const saved = loadSession(subject, level);
     if (saved?.length) {
       setMessages(saved);
+      // Restore only the last 10 exchanges into apiHistory — the sliding window
+      // in sendMessage will keep it bounded going forward, and we match that here
+      // so a resumed session doesn't blow the context window on the first message.
       const hist = saved.flatMap(m => m.role === "user"
         ? [{ role: "user", content: m.text }]
         : [{ role: "assistant", content: m.text }]);
-      setApiHistory(hist);
+      setApiHistory(hist.slice(-10));
     } else {
       setMessages([]); setApiHistory([]);
       sendMessage("Hello! I'm ready to start learning.", true);
@@ -127,10 +130,17 @@ export default function SmartStudyPage() {
     const userMsg = { role: "user", text: q };
     const newMessages = isInit ? [userMsg] : [...messages, userMsg];
     setMessages(newMessages);
-    const newHistory = [...apiHistory, { role: "user", content: q }];
+
+    // Sliding window: keep only the last 10 exchanges (5 user + 5 AI) sent to the API.
+    // This prevents context window overflow on long study sessions while preserving
+    // enough recent context for the AI to maintain teaching continuity.
+    const WINDOW = 10;
+    const windowedHistory = apiHistory.slice(-WINDOW);
+    const newHistory = [...windowedHistory, { role: "user", content: q }];
+
     setLoading(true);
     try {
-      const r = await fetchStudyChat(subject, level, apiHistory, q);
+      const r = await fetchStudyChat(subject, level, windowedHistory, q);
       const d = r.data;
       const aiMsg = { role: "ai", text: d.message, data: d };
       const finalMessages = [...newMessages, aiMsg];

@@ -11,10 +11,18 @@ export default defineConfig({
   ],
   build: {
     outDir: 'dist',
-    chunkSizeWarningLimit: 600,
+    chunkSizeWarningLimit: 800, // slightly higher to account for AI/Supabase libs
     rolldownOptions: {
       output: {
-        codeSplitting: true,
+        // Split heavy third-party libs into a separate cached chunk.
+        // Browsers cache vendor chunks independently, so students only
+        // re-download your app code when you ship updates — not React/Supabase.
+        manualChunks: {
+          vendor: ['react', 'react-dom'],
+          ui:     ['lucide-react', 'react-hot-toast'],
+          http:   ['axios'],
+          supabase: ['@supabase/supabase-js'],
+        },
       },
     },
   },
