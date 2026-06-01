@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Home, BookOpen, Dumbbell, Briefcase, MessageCircle, BarChart2, Clock, GraduationCap, CalendarDays, ChevronLeft, ChevronRight, LogOut, Zap, CheckCircle, Activity, ArrowRight, Navigation, Mic, Crown } from "lucide-react";
+import { Home, BookOpen, Dumbbell, Briefcase, MessageCircle, BarChart2, Clock, GraduationCap, CalendarDays, ChevronLeft, ChevronRight, LogOut, Activity, Navigation, Mic, Crown } from "lucide-react";
 import { getPlan } from "../lib/subscription";
 
 const NAV = [
@@ -12,10 +12,8 @@ const NAV = [
   { id: "mockinterview", label: "Mock Interview", icon: Mic,           color: "#f97316" },
   { id: "study",         label: "Smart Study",    icon: GraduationCap, color: "#a78bfa" },
   { id: "ask",           label: "Ask AI",         icon: MessageCircle, color: "#64748b" },
-  { id: "pricing",       label: "Pricing",        icon: Crown,         color: "#22d3ee" },
   { id: "history",       label: "History",        icon: Clock },
   { id: "progress",      label: "Progress",       icon: BarChart2 },
-  { id: "subscription",  label: "Subscription",   icon: Crown,         color: "#a78bfa" },
   { id: "stats",         label: "System Stats",   icon: Activity,      color: "#22d3ee" },
 ];
 
@@ -34,7 +32,7 @@ export default function Sidebar({ page, mode, setPage, setMode, collapsed, setCo
   }, []);
 
   const handleNav = (item) => {
-    if (["home", "progress", "ask", "history", "study", "learningplan", "interviewprep", "mockinterview", "pricing", "subscription", "stats", "goalroadmap"].includes(item.id)) {
+    if (["home", "progress", "ask", "history", "study", "learningplan", "interviewprep", "mockinterview", "subscription", "stats", "goalroadmap"].includes(item.id)) {
       setPage(item.id);
     } else {
       setMode(item.id);
@@ -43,7 +41,7 @@ export default function Sidebar({ page, mode, setPage, setMode, collapsed, setCo
   };
 
   const isActive = (item) => {
-    if (["home", "progress", "ask", "history", "study", "learningplan", "interviewprep", "mockinterview", "pricing", "subscription", "stats", "goalroadmap"].includes(item.id)) return page === item.id;
+    if (["home", "progress", "ask", "history", "study", "learningplan", "interviewprep", "mockinterview", "subscription", "stats", "goalroadmap"].includes(item.id)) return page === item.id;
     return page === "learn" && mode === item.id;
   };
 
@@ -96,6 +94,46 @@ export default function Sidebar({ page, mode, setPage, setMode, collapsed, setCo
           </div>
           <button className="sidebar-logout" onClick={onLogout} title="Logout"><LogOut size={14} /></button>
         </div>
+      )}
+
+      {/* Pricing cards section */}
+      {!collapsed && (
+        <div className="sb-pricing-section">
+          <div className="sb-pricing-label">Plans</div>
+          <div className="sb-pricing-cards">
+            <button 
+              className={`sb-plan-card ${plan === "free" ? "active" : ""}`}
+              onClick={() => setPage("pricing")}
+              title="Free Plan"
+            >
+              <div className="sb-plan-name">Free</div>
+              <div className="sb-plan-price">₹0</div>
+            </button>
+            <button 
+              className={`sb-plan-card ${plan === "pro" ? "active" : ""}`}
+              onClick={() => setPage("pricing")}
+              title="Pro Plan"
+            >
+              <div className="sb-plan-name">Pro</div>
+              <div className="sb-plan-price">₹199</div>
+            </button>
+            <button 
+              className={`sb-plan-card ${plan === "premium" ? "active" : ""}`}
+              onClick={() => setPage("pricing")}
+              title="Premium Plan"
+            >
+              <div className="sb-plan-name">Premium</div>
+              <div className="sb-plan-price">₹499</div>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {/* Pricing button — always visible */}
+      {!collapsed && (
+        <button className="sb-pricing-btn" onClick={() => setPage("pricing")} title="View pricing">
+          <Crown size={14} /> View All Plans
+        </button>
       )}
 
       {/* Upgrade button — navigates directly to subscription page */}
