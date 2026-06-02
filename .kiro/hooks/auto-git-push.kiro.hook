@@ -1,0 +1,14 @@
+{
+  "enabled": true,
+  "name": "Auto Git Push on Agent Stop",
+  "description": "After every agent task completes, automatically stages all changed files, commits with a descriptive message, and pushes to the current branch.",
+  "version": "1",
+  "when": {
+    "type": "agentStop"
+  },
+  "then": {
+    "type": "runCommand",
+    "command": "cd \"c:\\Users\\karth\\OneDrive\\Dokumen\\LearningWithAi\" && git diff --quiet && git diff --cached --quiet || (git add -A && git commit -m \"auto: sync changes\" && git push)",
+    "timeout": 30
+  }
+}
