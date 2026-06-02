@@ -62,16 +62,45 @@ export default function TutorActions({ topic, concept, wrongCount = 0 }) {
             <X size={13} />
           </button>
 
-          {(result.action === "simpler" || result.action === "deeper" || result.action === "example" || result.action === "struggling") && (
+          {(result.action === "simpler" || result.action === "example") && (
             <p>
               <span className="tutor-tag">
-                {result.action === "simpler"    && "💡 Simpler"}
-                {result.action === "deeper"     && "🔬 Deeper"}
-                {result.action === "example"    && "🌍 Example"}
-                {result.action === "struggling" && "🆘 Fresh Start"}
+                {result.action === "simpler" && "💡 Simpler"}
+                {result.action === "example" && "🌍 Example"}
               </span>
               {result.data.response}
             </p>
+          )}
+
+          {result.action === "struggling" && (
+            <div>
+              <p><span className="tutor-tag">🆘 Fresh Start</span></p>
+              <p style={{ color: "#a78bfa", marginBottom: "0.5rem" }}>
+                <strong>💪 </strong>{result.data.motivation}
+              </p>
+              <p style={{ marginBottom: "0.5rem" }}>{result.data.simplifiedExplanation}</p>
+              {result.data.actionableSteps?.length > 0 && (
+                <ol style={{ paddingLeft: "1.2rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                  {result.data.actionableSteps.map((step, i) => (
+                    <li key={i} style={{ color: "#94A3B8", fontSize: "0.85rem" }}>{step}</li>
+                  ))}
+                </ol>
+              )}
+            </div>
+          )}
+
+          {result.action === "deeper" && (
+            <div>
+              <p><span className="tutor-tag">🔬 Deeper</span></p>
+              <p style={{ marginBottom: "0.5rem" }}>{result.data.deepDive}</p>
+              {result.data.examples?.length > 0 && (
+                <ul style={{ paddingLeft: "1.2rem", display: "flex", flexDirection: "column", gap: "0.25rem" }}>
+                  {result.data.examples.map((ex, i) => (
+                    <li key={i} style={{ color: "#38bdf8", fontSize: "0.85rem" }}>{ex}</li>
+                  ))}
+                </ul>
+              )}
+            </div>
           )}
 
           {result.action === "testme" && <TestMeResult data={result.data} />}

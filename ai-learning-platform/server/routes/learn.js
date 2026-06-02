@@ -979,9 +979,13 @@ router.post("/tutor-action", async (req, res) => {
 Use a very basic analogy a child could understand. Avoid all jargon.
 Return ONLY valid JSON: {"response": ""}`,
 
-    deeper: `Give a deep technical explanation of "${concept}" (part of ${topic}).
-Include: how it works internally, edge cases, performance considerations, and advanced usage.
-Return ONLY valid JSON: {"response": ""}`,
+    deeper: `You are an expert AI tutor. The student wants to go deeper into "${concept}" (part of ${topic}).
+Provide advanced context, edge cases, and low-level implementation details.
+Return ONLY valid JSON:
+{
+  "deepDive": "Advanced technical explanation with internals, performance considerations, and advanced usage",
+  "examples": ["Advanced use-case or edge case 1", "Advanced use-case or edge case 2"]
+}`,
 
     example: `Give a completely different real-world example to explain "${concept}" (part of ${topic}).
 Make it practical and memorable. Return ONLY valid JSON: {"response": ""}`,
@@ -990,13 +994,15 @@ Make it practical and memorable. Return ONLY valid JSON: {"response": ""}`,
 Include the answer and a short explanation.
 Return ONLY valid JSON: {"question": "", "answer": "", "explanation": ""}`,
 
-    struggling: `A student is struggling to understand "${concept}" (part of ${topic}).
+    struggling: `The student is struggling to understand "${concept}" (part of ${topic}).
 They may have answered questions wrong or asked repeated doubts.
-Provide a completely fresh, simpler explanation using:
-1. A story or real-life scenario first
-2. Then a simple technical explanation
-3. A concrete example
-Return ONLY valid JSON: {"response": ""}`,
+Provide an encouraging response, break down the core hurdle, and give clear actionable steps.
+Return ONLY valid JSON:
+{
+  "motivation": "Encouraging and empathetic words to motivate them",
+  "simplifiedExplanation": "A crystal-clear, plain-English breakdown of the problem — use a story or real-life scenario first, then a simple technical explanation",
+  "actionableSteps": ["Concrete step 1 to overcome the confusion", "Concrete step 2", "Concrete step 3"]
+}`,
   };
 
   const prompt = prompts[action];
