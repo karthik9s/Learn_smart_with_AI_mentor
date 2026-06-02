@@ -158,8 +158,8 @@ export default function AskAIPage() {
         <form className="ac-input-bar" onSubmit={e => { e.preventDefault(); send(); }}>
           <textarea
             ref={inputRef}
-            className="ac-textarea"
-            placeholder="Ask anything..."
+            className=""
+            placeholder="Ask ..."
             value={input}
             onChange={e => setInput(e.target.value)}
             onKeyDown={e => {
